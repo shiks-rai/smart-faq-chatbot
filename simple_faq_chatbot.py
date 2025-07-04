@@ -30,6 +30,9 @@ st.title("📚 College PDF FAQ Chatbot")
 
 # Load and embed
 pdf_texts = load_pdfs('docs')
+for item in pdf_texts:
+    print(f"File: {item['filename']}, length of text: {len(item['text'])}")
+
 pdf_texts = embed_texts(pdf_texts)
 
 # Ask question
