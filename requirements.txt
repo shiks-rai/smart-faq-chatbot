@@ -1,4 +1,5 @@
 streamlit
 pandas
 sentence_transformers
-scikit-learn
+PyPDF2
+faiss-cpu
