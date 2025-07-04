@@ -1,39 +1,46 @@
-import streamlit as st
-import pandas as pd
+import os
+import PyPDF2
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+import streamlit as st
 
 # Load model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Load FAQ data
-faq = pd.read_csv("faq.csv")
+# Read PDFs from docs folder
+def load_pdfs(folder):
+    all_texts = []
+    for filename in os.listdir(folder):
+        if filename.endswith('.pdf'):
+            path = os.path.join(folder, filename)
+            with open(path, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                text = ''
+                for page in reader.pages:
+                    text += page.extract_text() or ''
+                all_texts.append({'filename': filename, 'text': text})
+    return all_texts
 
-# Compute embeddings for all known questions once
-faq['embedding'] = faq['question'].apply(lambda x: model.encode(x))
+# Embed texts
+def embed_texts(texts):
+    for item in texts:
+        item['embedding'] = model.encode(item['text'])
+    return texts
 
-# Streamlit UI
-st.title("🤖 Smart College FAQ Chatbot")
+st.title("📚 College PDF FAQ Chatbot")
 
-user_question = st.text_input("Ask your question:")
+# Load and embed
+pdf_texts = load_pdfs('docs')
+pdf_texts = embed_texts(pdf_texts)
 
-if user_question:
-    # Encode user question
-    user_embedding = model.encode(user_question)
+# Ask question
+query = st.text_input("Ask something:")
 
-    # Compute cosine similarities with all FAQ questions
-    similarities = faq['embedding'].apply(lambda x: cosine_similarity(
-        [user_embedding], [x])[0][0])
-
-    # Find best match
-    best_match_idx = similarities.idxmax()
-    best_score = similarities[best_match_idx]
-
-    # Set a reasonable threshold
-    threshold = 0.6
-
-    if best_score >= threshold:
-        answer = faq.loc[best_match_idx, 'answer']
-        st.write(f"✅ {answer} (similarity: {best_score:.2f})")
-    else:
-        st.write("❓ Sorry, I don't know the answer. Try asking differently.")
+if query:
+    query_emb = model.encode(query)
+    # Simple similarity (dot product)
+    scores = [(item['filename'], item['text'][:200], float(query_emb @ item['embedding'])) for item in pdf_texts]
+    scores.sort(key=lambda x: x[2], reverse=True)
+    
+    st.write("### Top result:")
+    st.write(f"📄 **File:** {scores[0][0]}")
+    st.write(f"📝 **Excerpt:** {scores[0][1]}...")
