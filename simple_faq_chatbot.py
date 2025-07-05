@@ -10,7 +10,7 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def load_subject_chunks(pdf_folder):
     subjects = []
-    # Loosened regex: match lines containing "Course" anywhere
+    # Regex: match any line containing 'Course' (case-insensitive)
     pattern = re.compile(r'.*Course.*', re.IGNORECASE)
 
     for filename in os.listdir(pdf_folder):
@@ -24,14 +24,13 @@ def load_subject_chunks(pdf_folder):
                     if text:
                         full_text += '\n' + text
 
-                # Split by lines
                 lines = full_text.split('\n')
                 current_subject = ''
                 current_text = ''
                 for line in lines:
                     if pattern.match(line):
-                        print("Matched header line:", line)  # debug
-                        # save previous subject
+                        print("✅ Matched header line:", line)  # debug print
+                        # Save previous subject
                         if current_subject:
                             subjects.append({
                                 'subject': current_subject.strip(),
@@ -43,7 +42,7 @@ def load_subject_chunks(pdf_folder):
                     else:
                         current_text += line + '\n'
 
-                # save last subject
+                # Save last subject
                 if current_subject:
                     subjects.append({
                         'subject': current_subject.strip(),
@@ -57,16 +56,18 @@ def embed_subjects(subjects):
         subj['embedding'] = model.encode(subj['text'])
     return subjects
 
-# Streamlit UI
+# Streamlit app
 st.title("📚 Smart College PDF Subject Syllabus Bot")
 
 with st.spinner("Loading subjects..."):
     subjects = load_subject_chunks('docs')
-    if not subjects:
-        st.error("❗ No subjects found in PDFs! Check PDF content or regex.")
-    else:
+    st.write(f"📦 Found {len(subjects)} subjects")  # show in UI
+
+    if subjects:
         subjects = embed_subjects(subjects)
         st.success(f"✅ Loaded {len(subjects)} subjects from PDFs.")
+    else:
+        st.error("❗ No subjects found in PDFs! Check PDF content or regex.")
 
 query = st.text_input("Ask your question:")
 
@@ -81,10 +82,11 @@ if query and subjects:
         )
         for subj in subjects
     ]
-    scores.sort(key=lambda x: x[3], reverse=True)
 
     if scores:
+        scores.sort(key=lambda x: x[3], reverse=True)
         top_subject, top_text, top_file, top_score = scores[0]
+
         if top_score > 0.4:
             st.subheader(f"✅ Best match (similarity: {top_score:.2f}) from {top_file}")
             st.write(f"### {top_subject}")
@@ -93,3 +95,5 @@ if query and subjects:
             st.write("❓ Sorry, I couldn't find that subject in the PDFs.")
     else:
         st.write("❓ No matches found. Try another question.")
+elif query and not subjects:
+    st.error("❗ Cannot search because no subjects were loaded from PDFs.")
