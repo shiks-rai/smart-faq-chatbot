@@ -10,7 +10,8 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def load_subject_chunks(pdf_folder):
     subjects = []
-    pattern = re.compile(r'.*Course.*', re.IGNORECASE)  # loosen regex
+    # Looser regex: match any line containing 'Course' (case-insensitive)
+    pattern = re.compile(r'.*Course.*', re.IGNORECASE)
 
     for filename in os.listdir(pdf_folder):
         if filename.endswith('.pdf'):
@@ -23,7 +24,6 @@ def load_subject_chunks(pdf_folder):
                     if text:
                         full_text += '\n' + text
 
-                # debug: print what we actually got
                 print("=== First 1000 chars of PDF ===")
                 print(full_text[:1000])
 
@@ -32,7 +32,7 @@ def load_subject_chunks(pdf_folder):
                 current_text = ''
                 for line in lines:
                     if pattern.match(line):
-                        print("✅ Matched header line:", line)  # debug print
+                        print("✅ Matched header line:", line)
                         if current_subject:
                             subjects.append({
                                 'subject': current_subject.strip(),
@@ -44,7 +44,6 @@ def load_subject_chunks(pdf_folder):
                     else:
                         current_text += line + '\n'
 
-                # Save last subject
                 if current_subject:
                     subjects.append({
                         'subject': current_subject.strip(),
@@ -63,23 +62,24 @@ st.title("📚 Smart College PDF Subject Syllabus Bot")
 
 with st.spinner("Loading subjects..."):
     subjects = load_subject_chunks('docs')
-    st.write(f"📦 Found {len(subjects)} subjects")  # always show this
+    st.write(f"📦 Found {len(subjects)} subjects")
 
-    if subjects:
-        subjects = embed_subjects(subjects)
-        st.success(f"✅ Loaded {len(subjects)} subjects from PDFs.")
-    else:
+    if not subjects:
         st.error("❗ No subjects found. Regex failed or PDFs empty.")
         st.stop()  # stop safely if nothing found
+
+    subjects = embed_subjects(subjects)
+    st.success(f"✅ Loaded {len(subjects)} subjects from PDFs.")
 
 query = st.text_input("Ask your question:")
 
 if query:
-    if subjects:  # double-check subjects loaded
+    if not subjects:
+        st.error("❗ Cannot search: no subjects loaded.")
+    else:
         query_emb = model.encode(query)
         scores = [
             (
-                
                 subj['subject'],
                 subj['text'],
                 subj['source'],
@@ -88,7 +88,9 @@ if query:
             for subj in subjects
         ]
 
-        if scores:
+        if not scores:
+            st.write("❓ No matches found. Try another question.")
+        else:
             scores.sort(key=lambda x: x[3], reverse=True)
             top_subject, top_text, top_file, top_score = scores[0]
 
@@ -98,7 +100,3 @@ if query:
                 st.write(top_text)
             else:
                 st.write("❓ Sorry, I couldn't find that subject in the PDFs.")
-        else:
-            st.write("❓ No matches found.")
-    else:
-        st.write("❗ Cannot search: no subjects loaded.")
