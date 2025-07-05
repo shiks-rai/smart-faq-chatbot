@@ -1,49 +1,53 @@
 import os
 import PyPDF2
 from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 
-# Load model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Read PDFs from docs folder
-def load_pdfs(folder):
-    all_texts = []
+def load_and_chunk_pdfs(folder):
+    chunks = []
     for filename in os.listdir(folder):
         if filename.endswith('.pdf'):
             path = os.path.join(folder, filename)
             with open(path, 'rb') as f:
                 reader = PyPDF2.PdfReader(f)
-                text = ''
-                for page in reader.pages:
-                    text += page.extract_text() or ''
-                all_texts.append({'filename': filename, 'text': text})
-    return all_texts
+                for page_num, page in enumerate(reader.pages):
+                    text = page.extract_text()
+                    if text:
+                        # break page text into smaller chunks
+                        for i in range(0, len(text), 500):
+                            chunk = text[i:i+500]
+                            chunks.append({'source': f"{filename} p{page_num+1}", 'text': chunk})
+    return chunks
 
-# Embed texts
-def embed_texts(texts):
-    for item in texts:
-        item['embedding'] = model.encode(item['text'])
-    return texts
+def embed_chunks(chunks):
+    for chunk in chunks:
+        chunk['embedding'] = model.encode(chunk['text'])
+    return chunks
 
-st.title("📚 College PDF FAQ Chatbot")
+st.title("📚 Smart College PDF QA Bot")
 
-# Load and embed
-pdf_texts = load_pdfs('docs')
-for item in pdf_texts:
-    print(f"File: {item['filename']}, length of text: {len(item['text'])}")
+with st.spinner("Loading PDFs and creating embeddings..."):
+    pdf_chunks = load_and_chunk_pdfs('docs')
+    pdf_chunks = embed_chunks(pdf_chunks)
 
-pdf_texts = embed_texts(pdf_texts)
+question = st.text_input("Ask your question:")
 
-# Ask question
-query = st.text_input("Ask something:")
-
-if query:
-    query_emb = model.encode(query)
-    # Simple similarity (dot product)
-    scores = [(item['filename'], item['text'][:200], float(query_emb @ item['embedding'])) for item in pdf_texts]
+if question:
+    question_emb = model.encode(question)
+    # Compute similarity with all chunks
+    scores = [
+        (chunk['source'], chunk['text'], float(cosine_similarity([question_emb], [chunk['embedding']])[0][0]))
+        for chunk in pdf_chunks
+    ]
+    # Sort by highest score
     scores.sort(key=lambda x: x[2], reverse=True)
-    
-    st.write("### Top result:")
-    st.write(f"📄 **File:** {scores[0][0]}")
-    st.write(f"📝 **Excerpt:** {scores[0][1]}...")
+    top_source, top_text, top_score = scores[0]
+
+    if top_score > 0.4:  # adjust threshold as needed
+        st.subheader(f"📄 Best match (similarity: {top_score:.2f}) from {top_source}:")
+        st.write(top_text)
+    else:
+        st.write("❓ Sorry, I don't know the answer. Try asking differently.")
