@@ -9,9 +9,9 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def load_subjects_with_modules(pdf_folder):
     subjects = []
-    # Match lines that include 'Course:' anywhere (very loose)
+    # Match lines containing 'Course' (subject header)
     course_pattern = re.compile(r'.*Course.*', re.IGNORECASE)
-    # Match anything starting with "Module" and a number, robust:
+    # Match anything starting with "Module" and a number
     module_pattern = re.compile(r'\s*Module.*\d+', re.IGNORECASE)
 
     for filename in os.listdir(pdf_folder):
@@ -25,7 +25,14 @@ def load_subjects_with_modules(pdf_folder):
                     if t:
                         text += '\n' + t
 
+                # Split into lines
                 lines = text.split('\n')
+
+                # ✅ Debug: print first 50 lines
+                print(f"\n=== First 50 lines from {filename} ===")
+                for line in lines[:50]:
+                    print(repr(line))
+
                 current_subject = None
                 current_modules = []
                 current_module = None
@@ -57,12 +64,13 @@ def load_subjects_with_modules(pdf_folder):
                 if current_subject:
                     subjects.append({'subject': current_subject.strip(), 'modules': current_modules, 'file': filename})
 
-    print("\n=== Debug: Subjects & Modules ===")
+    # ✅ Debug: print summary of subjects & modules
+    print("\n=== Summary: Subjects & Modules ===")
     for subj in subjects:
         print(f"Subject: {subj['subject']} (from file: {subj['file']})")
         print(f"Modules found: {len(subj['modules'])}")
         for mod in subj['modules']:
-            print(f"- {mod['module']}, text length: {len(mod['text'])}")
+            print(f"- {mod['module']} | text length: {len(mod['text'])}")
 
     return subjects
 
@@ -74,7 +82,7 @@ def embed_subjects(subjects):
 st.title("📚 Smart Syllabus Bot with Modules Table")
 
 with st.spinner("Loading PDFs and extracting modules..."):
-    subjects = load_subjects_with_modules('docs')
+    subjects = load_subjects_with_modules('docs')  # your PDFs should be inside a folder called 'docs'
     st.write(f"📦 Found {len(subjects)} subjects from PDFs")
     if not subjects:
         st.error("❗ No subjects found. Check PDF structure or regex.")
@@ -101,11 +109,12 @@ if query:
         for mod in best_subj['modules']:
             table_rows.append({
                 "Module": mod['module'],
-                "Topics (short preview)": mod['text'][:200] + "..."
+                "Topics (preview)": mod['text'][:200] + "..."
             })
+
         if table_rows:
             st.table(table_rows)
         else:
-            st.write("⚠ No modules found inside this subject. Check parsing.")
+            st.warning("⚠ No modules found inside this subject. Check parsing.")
     else:
         st.write("❓ Couldn't find a matching subject.")
