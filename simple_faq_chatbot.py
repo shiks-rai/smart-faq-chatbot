@@ -9,9 +9,9 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def load_subjects_with_modules(pdf_folder):
     subjects = []
-    # Regex: lines starting with "Course:" (case‑insensitive)
+    # Match "Course:" anywhere
     course_pattern = re.compile(r'.*Course.*', re.IGNORECASE)
-    # Regex: lines starting with Module
+    # Match "Module – 1" or "Module-1"
     module_pattern = re.compile(r'\s*Module\s*[-–]?\s*\d+', re.IGNORECASE)
 
     for filename in os.listdir(pdf_folder):
@@ -31,7 +31,7 @@ def load_subjects_with_modules(pdf_folder):
                 current_module = None
                 current_text = ''
                 for line in lines:
-                    if course_pattern.match(line):
+                    if course_pattern.search(line):
                         # save previous subject
                         if current_subject:
                             if current_module:
@@ -88,8 +88,11 @@ if query:
     if best_score > 0.4:
         st.subheader(f"✅ Showing syllabus for: {best_subj['subject']} (score: {best_score:.2f})")
 
+        # Show as table
+        table_rows = []
         for mod in best_subj['modules']:
-            st.markdown(f"### 📌 {mod['module']}")
-            st.write(mod['text'])
+            table_rows.append({"Module": mod['module'], "Topics": mod['text'][:200]+"..."})  # show first 200 chars
+
+        st.table(table_rows)
     else:
         st.write("❓ Couldn't find a matching subject.")
