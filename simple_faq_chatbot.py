@@ -9,10 +9,10 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def load_subjects_with_modules(pdf_folder):
     subjects = []
-    # Match "Course:" anywhere
+    # Match lines that include 'Course:' anywhere (very loose)
     course_pattern = re.compile(r'.*Course.*', re.IGNORECASE)
-    # Match "Module – 1" or "Module-1"
-    module_pattern = re.compile(r'\s*Module\s*[-–]?\s*\d+', re.IGNORECASE)
+    # Match anything starting with "Module" and a number, robust:
+    module_pattern = re.compile(r'\s*Module.*\d+', re.IGNORECASE)
 
     for filename in os.listdir(pdf_folder):
         if filename.endswith('.pdf'):
@@ -30,9 +30,10 @@ def load_subjects_with_modules(pdf_folder):
                 current_modules = []
                 current_module = None
                 current_text = ''
+
                 for line in lines:
                     if course_pattern.search(line):
-                        # save previous subject
+                        print(f"✅ Found subject line: {line}")
                         if current_subject:
                             if current_module:
                                 current_modules.append({'module': current_module, 'text': current_text.strip()})
@@ -42,7 +43,7 @@ def load_subjects_with_modules(pdf_folder):
                         current_module = None
                         current_text = ''
                     elif module_pattern.match(line):
-                        # save previous module
+                        print(f"🔹 Found module line: {line}")
                         if current_module:
                             current_modules.append({'module': current_module, 'text': current_text.strip()})
                         current_module = line.strip()
@@ -55,6 +56,13 @@ def load_subjects_with_modules(pdf_folder):
                     current_modules.append({'module': current_module, 'text': current_text.strip()})
                 if current_subject:
                     subjects.append({'subject': current_subject.strip(), 'modules': current_modules, 'file': filename})
+
+    print("\n=== Debug: Subjects & Modules ===")
+    for subj in subjects:
+        print(f"Subject: {subj['subject']} (from file: {subj['file']})")
+        print(f"Modules found: {len(subj['modules'])}")
+        for mod in subj['modules']:
+            print(f"- {mod['module']}, text length: {len(mod['text'])}")
 
     return subjects
 
@@ -88,11 +96,16 @@ if query:
     if best_score > 0.4:
         st.subheader(f"✅ Showing syllabus for: {best_subj['subject']} (score: {best_score:.2f})")
 
-        # Show as table
+        # Show modules table
         table_rows = []
         for mod in best_subj['modules']:
-            table_rows.append({"Module": mod['module'], "Topics": mod['text'][:200]+"..."})  # show first 200 chars
-
-        st.table(table_rows)
+            table_rows.append({
+                "Module": mod['module'],
+                "Topics (short preview)": mod['text'][:200] + "..."
+            })
+        if table_rows:
+            st.table(table_rows)
+        else:
+            st.write("⚠ No modules found inside this subject. Check parsing.")
     else:
         st.write("❓ Couldn't find a matching subject.")
