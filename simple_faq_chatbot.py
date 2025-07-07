@@ -14,7 +14,8 @@ def load_subjects_with_modules(pdf_folder):
     # Match anything starting with "Module" and a number
 module_pattern = re.compile(r'\s*Module\s*[-–:]?\s*\d+.*', re.IGNORECASE)
 
-    for filename in os.listdir(pdf_folder):
+    
+for filename in os.listdir(pdf_folder):
         if filename.endswith('.pdf'):
             path = os.path.join(pdf_folder, filename)
             with open(path, 'rb') as f:
