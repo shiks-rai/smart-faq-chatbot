@@ -11,11 +11,10 @@ def load_subjects_with_modules(pdf_folder):
     subjects = []
     # Match lines containing 'Course' (subject header)
     course_pattern = re.compile(r'.*Course.*', re.IGNORECASE)
-    # Match anything starting with "Module" and a number
-module_pattern = re.compile(r'\s*Module\s*[-–:]?\s*\d+.*', re.IGNORECASE)
+    # Match anything starting with "Module" and a number, allowing dashes, colons etc.
+    module_pattern = re.compile(r'\s*Module\s*[-–:]?\s*\d+.*', re.IGNORECASE)
 
-    
-for filename in os.listdir(pdf_folder):
+    for filename in os.listdir(pdf_folder):
         if filename.endswith('.pdf'):
             path = os.path.join(pdf_folder, filename)
             with open(path, 'rb') as f:
