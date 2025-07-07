@@ -3,3 +3,4 @@ pandas
 sentence_transformers
 PyPDF2
 faiss-cpu
+torch==2.0.1
